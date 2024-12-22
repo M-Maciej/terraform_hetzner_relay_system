@@ -1,0 +1,81 @@
+---
+- name: First apply to deploy bastion
+  hosts: local
+  gather_facts: false
+  tags: ["deploy1"]
+  tasks:
+    - name: Terraform INIT
+      command: terraform init
+      args:
+        chdir: "../terraform"
+
+    - name: Terraform PLAN (bastion + network + subnet)
+      command: >
+        terraform plan
+        -out=plan1
+        -target=hcloud_network.vpc
+        -target=hcloud_network_subnet.multiple_jump_network_subnet
+        -target=hcloud_ssh_key.bastion_ssh
+        -target=hcloud_server.bastion
+      args:
+        chdir: "../terraform"
+
+    - name: Terraform APPLY (bastion + network + subnet)
+      command: >
+        terraform apply
+        -auto-approve
+        plan1
+      args:
+        chdir: "../terraform"
+
+- name: Second apply to deploy internal resources
+  hosts: local
+  gather_facts: false
+  tags: ["deploy2"]
+  tasks:
+    - name: Terraform PLAN (internal resources)
+      command: >
+        terraform plan
+        -out=plan2
+        -target=hcloud_ssh_key.internal_ssh
+        -target=hcloud_server.internal
+      args:
+        chdir: "../terraform"
+
+    - name: Terraform APPLY (internal resources)
+      command: >
+        terraform apply
+        -auto-approve
+        plan2
+      args:
+        chdir: "../terraform"
+
+- name: Destroy bastion resources
+  hosts: local
+  gather_facts: false
+  tags: ["destroy1"]
+  tasks:
+    - name: Terraform DESTROY bastion + network + subnet
+      command: >
+        terraform destroy
+        -auto-approve
+        -target=hcloud_network.vpc
+        -target=hcloud_network_subnet.multiple_jump_network_subnet
+        -target=hcloud_ssh_key.bastion_ssh
+        -target=hcloud_server.bastion
+      args:
+        chdir: "../terraform"
+
+- name: Destroy internal resources
+  hosts: local
+  gather_facts: false
+  tags: ["destroy2"]
+  tasks:
+    - name: Terraform DESTROY internal
+      command: >
+        terraform destroy
+        -auto-approve
+        -target=hcloud_ssh_key.internal_ssh
+        -target=hcloud_server.internal
+      args:
+        chdir: "../terraform"

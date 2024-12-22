@@ -1,0 +1,13 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+runcmd:
+  # Disable SSH password authentication entirely
+  - sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+
+  # Allow root login but only with an SSH key (no password)
+  - sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+
+  # Restart SSH to apply
+  - systemctl restart ssh
