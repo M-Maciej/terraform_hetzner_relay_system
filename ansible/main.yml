@@ -1,10 +1,54 @@
 ---
+- name: Create SSH keys (bastion, internal, application)
+  hosts: localhost
+  gather_facts: false
+  tags: ["keys"]
+  tasks:
+    - name: Remove old bastion ssh key if exists
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "~/.ssh/bastion_key_temp"
+        - "~/.ssh/bastion_key_temp.pub"
+
+    - name: Create bastion ssh key (no passphrase)
+      command: ssh-keygen -t ecdsa -b 521 -N "" -f ~/.ssh/bastion_key_temp
+      args:
+        chdir: "../terraform"
+
+    - name: Remove old internal ssh key if exists
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "~/.ssh/internal_key_temp"
+        - "~/.ssh/internal_key_temp.pub"
+
+    - name: Create internal ssh key (no passphrase)
+      command: ssh-keygen -t ecdsa -b 521 -N "" -f ~/.ssh/internal_key_temp
+      args:
+        chdir: "../terraform"
+
+    - name: Remove old application ssh key if exists
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "~/.ssh/application_key_temp"
+        - "~/.ssh/application_key_temp.pub"
+
+    - name: Create application ssh key (no passphrase)
+      command: ssh-keygen -t ecdsa -b 521 -N "" -f ~/.ssh/application_key_temp
+      args:
+        chdir: "../terraform"
+
 - name: First apply to deploy bastion
-  hosts: local
+  hosts: localhost
   gather_facts: false
   tags: ["deploy1"]
   tasks:
-    - name: Terraform INIT
+    - name: Terraform INIT (bastion stage)
       command: terraform init
       args:
         chdir: "../terraform"
@@ -29,20 +73,21 @@
         chdir: "../terraform"
 
 - name: Second apply to deploy internal resources
-  hosts: local
+  hosts: localhost
   gather_facts: false
   tags: ["deploy2"]
   tasks:
-    - name: Terraform PLAN (internal resources)
+    - name: Terraform PLAN (internal)
       command: >
         terraform plan
         -out=plan2
         -target=hcloud_ssh_key.internal_ssh
+        -target=hcloud_ssh_key.internal_ssh_relay
         -target=hcloud_server.internal
       args:
         chdir: "../terraform"
 
-    - name: Terraform APPLY (internal resources)
+    - name: Terraform APPLY (internal)
       command: >
         terraform apply
         -auto-approve
@@ -50,32 +95,71 @@
       args:
         chdir: "../terraform"
 
+- name: Third apply to deploy application resources
+  hosts: localhost
+  gather_facts: false
+  tags: ["deploy3"]
+  tasks:
+    - name: Terraform PLAN (application)
+      command: >
+        terraform plan
+        -out=plan3
+        -target=hcloud_ssh_key.application_ssh
+        -target=hcloud_ssh_key.application_ssh_relay
+        -target=hcloud_server.application
+      args:
+        chdir: "../terraform"
+
+    - name: Terraform APPLY (application)
+      command: >
+        terraform apply
+        -auto-approve
+        plan3
+      args:
+        chdir: "../terraform"
+
 - name: Destroy bastion resources
-  hosts: local
+  hosts: localhost
   gather_facts: false
   tags: ["destroy1"]
   tasks:
-    - name: Terraform DESTROY bastion + network + subnet
+    - name: Terraform DESTROY (bastion + network + subnet)
       command: >
         terraform destroy
         -auto-approve
-        -target=hcloud_network.vpc
         -target=hcloud_network_subnet.multiple_jump_network_subnet
+        -target=hcloud_network.vpc
         -target=hcloud_ssh_key.bastion_ssh
         -target=hcloud_server.bastion
       args:
         chdir: "../terraform"
 
 - name: Destroy internal resources
-  hosts: local
+  hosts: localhost
   gather_facts: false
   tags: ["destroy2"]
   tasks:
-    - name: Terraform DESTROY internal
+    - name: Terraform DESTROY (internal)
       command: >
         terraform destroy
         -auto-approve
         -target=hcloud_ssh_key.internal_ssh
+        -target=hcloud_ssh_key.internal_ssh_relay
         -target=hcloud_server.internal
+      args:
+        chdir: "../terraform"
+
+- name: Destroy application resources
+  hosts: localhost
+  gather_facts: false
+  tags: ["destroy3"]
+  tasks:
+    - name: Terraform DESTROY (application)
+      command: >
+        terraform destroy
+        -auto-approve
+        -target=hcloud_ssh_key.application_ssh
+        -target=hcloud_ssh_key.application_ssh_relay
+        -target=hcloud_server.application
       args:
         chdir: "../terraform"
