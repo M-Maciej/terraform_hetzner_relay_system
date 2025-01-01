@@ -37,3 +37,9 @@ override.tf.json
 terraform.rc
 
 *.pub
+
+plan1
+
+plan2
+
+plan3

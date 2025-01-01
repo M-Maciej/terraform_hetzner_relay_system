@@ -1,0 +1,16 @@
+---
+- name: "Run main.yml with creation tags"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Invoke main.yml for creation (keys + deploy)"
+      command: >
+        ansible-playbook
+        -i inventory
+        main.yml
+        --tags "create-keys,deploy1,deploy2,deploy3,chaininfo"
+      register: create_output
+
+    - name: Print output
+      debug:
+        var: create_output.stdout_lines

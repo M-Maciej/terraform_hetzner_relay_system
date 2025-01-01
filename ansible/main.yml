@@ -163,3 +163,33 @@
         -target=hcloud_server.application
       args:
         chdir: "../terraform"
+- name: Gather SSH chain info
+  hosts: localhost
+  gather_facts: false
+  tags: ["chaininfo"]
+  tasks:
+
+    - name: Read Terraform outputs as JSON
+      command: terraform output -json
+      args:
+        chdir: "../terraform"
+      register: tf_outputs
+
+    - name: Set facts from Terraform outputs
+      set_fact:
+        bastion_ip: "{{ (tf_outputs.stdout | from_json())['bastion_ip']['value'] }}"
+        internal_ip: "{{ (tf_outputs.stdout | from_json())['internal_ip']['value'] }}"
+        application_ip: "{{ (tf_outputs.stdout | from_json())['application_ip']['value'] }}"
+
+
+    - name: Print final multi-hop SSH command
+      debug:
+        msg: >-
+          ssh-keygen -f '/home/arte/.ssh/known_hosts' -R '{{ bastion_ip }}';
+          ssh-keygen -f '/home/arte/.ssh/known_hosts' -R '{{ internal_ip }}';
+          ssh-keygen -f '/home/arte/.ssh/known_hosts' -R '{{ application_ip }}';
+          ssh
+          -o StrictHostKeyChecking=no
+          -J root@{{ bastion_ip }},root@{{ internal_ip }}
+          root@{{ application_ip }}
+    
