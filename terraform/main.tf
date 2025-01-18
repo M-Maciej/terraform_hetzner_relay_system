@@ -78,6 +78,7 @@ resource "hcloud_server" "bastion" {
     hcloud_ssh_key.bastion_ssh.name
   ]
 
+
   network {
     network_id = hcloud_network.vpc.id
   }
@@ -109,6 +110,10 @@ resource "hcloud_server" "bastion" {
         ./id_internal_ecdsa_public_key.pub
     EOT
   }
+}
+resource "hcloud_server_network" "bastion_net" {
+  server_id  = hcloud_server.bastion.id
+  network_id = hcloud_network.vpc.id
 }
 
 ##############################
@@ -145,6 +150,7 @@ resource "hcloud_server" "internal" {
     hcloud_ssh_key.internal_ssh_relay.name
   ]
 
+
   network {
     network_id = hcloud_network.vpc.id
   }
@@ -177,7 +183,10 @@ resource "hcloud_server" "internal" {
     EOT
   }
 }
-
+resource "hcloud_server_network" "internal_net" {
+  server_id  = hcloud_server.internal.id
+  network_id = hcloud_network.vpc.id
+}
 ############################################
 # 8) Data Source: local_file (application key)
 ############################################
@@ -211,22 +220,36 @@ resource "hcloud_server" "application" {
     hcloud_ssh_key.application_ssh_relay.name
   ]
 
-  network {
-    network_id = hcloud_network.vpc.id
-  }
+  
 }
+resource "hcloud_server_network" "application_net" {
+  server_id  = hcloud_server.application.id
+  network_id = hcloud_network.vpc.id
+  ip         = "10.0.1.5"
+}
+############################################
+# 11) Outputs for Ansible
+############################################
 
 output "bastion_ip" {
   description = "Public IPv4 of the bastion (or private, if you have a direct route)."
   value       = hcloud_server.bastion.ipv4_address
 }
-
 output "internal_ip" {
   description = "IP of the internal server."
-  value       = hcloud_server.internal.ipv4_address
+  value       = hcloud_server_network.internal_net.ip
 }
 
 output "application_ip" {
   description = "IP of the application server."
-  value       = hcloud_server.application.ipv4_address
+  value       = hcloud_server_network.application_net.ip
+}
+output "internal_private_ip" {
+  description = "Private IP of the internal server."
+  value       = hcloud_server_network.internal_net.ip
+}
+
+output "application_private_ip" {
+  description = "Private IP of the application server."
+  value       = hcloud_server_network.application_net.ip
 }
