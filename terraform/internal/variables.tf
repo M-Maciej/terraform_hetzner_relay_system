@@ -13,3 +13,8 @@ variable "internal_public_key_path" {
   description = "Local path to the bastion's public SSH key"
 }
 
+variable "bastion_ready_id" {
+  type        = string
+  description = "Wait for bastion's local-exec to finish"
+}
+

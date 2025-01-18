@@ -1,8 +1,16 @@
 terraform {
   required_providers {
     hcloud = {
-      source = "hetznercloud/hcloud"
+      source  = "hetznercloud/hcloud"
       version = "~> 1.49"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+    null = {
+      source = "hashicorp/null"
+      version = "3.2.3"
     }
   }
 }
@@ -15,14 +23,35 @@ resource "hcloud_ssh_key" "internal_ssh" {
   name       = "internal_root_key"
   public_key = file(var.internal_public_key_path)
 }
+resource "null_resource" "wait_for_bastion" {
+  # This says "Don't create me until bastion_ready_id is known"
+  # The resource you reference (null_resource.bastion_ready in the other module)
+  # is completed, meaning the local-exec is done.
+  triggers = {
+    bastion_ready_id = var.bastion_ready_id
+  }
+}
+
+
+
+data "local_file" "internal_public_key_relay" {
+  filename   = "./id_internal_ecdsa_public_key.pub"
+  depends_on = [null_resource.wait_for_bastion]
+}
+
+
+resource "hcloud_ssh_key" "internal_ssh_relay" {
+  depends_on = [data.local_file.internal_public_key_relay]
+  name       = "internal_ssh_key_from_bastion"
+  public_key = data.local_file.internal_public_key_relay.content
+}
 
 resource "hcloud_server" "internal" {
-  depends_on = [hcloud_server.bastion]
   name       = "internal-relay"
   server_type = "cx22"
   image      = "ubuntu-24.04"
   location   = "fsn1"
-
+  depends_on = [data.local_file.internal_public_key_relay]
   # Use BOTH the local key + the relay key from the bastion
   ssh_keys = [
     hcloud_ssh_key.internal_ssh.name,
@@ -31,7 +60,7 @@ resource "hcloud_server" "internal" {
 
 
   network {
-    network_id = hcloud_network.vpc.id
+    network_id = var.network_id
   }
   # (A) Remote-exec: Generate "id_application_ecdsa" on the *internal* server
   provisioner "remote-exec" {
@@ -59,8 +88,11 @@ resource "hcloud_server" "internal" {
     EOT
   }
 }
-
+resource "null_resource" "internal_ready" {
+  depends_on = [hcloud_server.internal]
+}
 resource "hcloud_server_network" "internal_net" {
   server_id  = hcloud_server.internal.id
   network_id = var.network_id
 }
+

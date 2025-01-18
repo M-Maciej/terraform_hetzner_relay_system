@@ -7,6 +7,10 @@ terraform {
       source = "hetznercloud/hcloud"
       version = "~> 1.49"
     }
+    null = {
+      source = "hashicorp/null"
+      version = "3.2.3"
+    }
   }
 }
 
@@ -67,6 +71,10 @@ resource "hcloud_server" "bastion" {
     EOT
   }
 }
+resource "null_resource" "bastion_ready" {
+  depends_on = [hcloud_server.bastion]
+}
+
 resource "hcloud_server_network" "bastion_net" {
   server_id  = hcloud_server.bastion.id
   network_id = var.network_id
