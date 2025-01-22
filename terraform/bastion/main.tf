@@ -40,7 +40,10 @@ resource "hcloud_server" "bastion" {
     hcloud_ssh_key.bastion_ssh.name
   ]
 
-
+  public_net {
+    ipv4_enabled = false
+    ipv6_enabled = true
+  }
   network {
     network_id = var.network_id
   }
@@ -49,13 +52,16 @@ resource "hcloud_server" "bastion" {
   provisioner "remote-exec" {
     inline = [
       "ssh-keygen -t ecdsa -N '' -f /root/.ssh/id_internal_ecdsa",
-      "cat /root/.ssh/id_internal_ecdsa.pub > /tmp/id_internal_ecdsa_public_key.pub"
+      "cat /root/.ssh/id_internal_ecdsa.pub > /tmp/id_internal_ecdsa_public_key.pub",
+      "sed -i 's/^#*MaxAuthTries.*/MaxAuthTries 100/' /etc/ssh/ssh_config",
+      # Restart the SSH service to apply changes
+      "systemctl restart ssh"
     ]
     connection {
       type        = "ssh"
       user        = "root"
       private_key = file("~/.ssh/bastion_key_temp") # The matching private key from your local machine
-      host        = self.ipv4_address
+      host        = self.ipv6_address
     }
   }
 
@@ -66,7 +72,7 @@ resource "hcloud_server" "bastion" {
         -i ~/.ssh/bastion_key_temp \
         -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null \
-        root@${self.ipv4_address}:/tmp/id_internal_ecdsa_public_key.pub \
+        root@[${self.ipv6_address}]:/tmp/id_internal_ecdsa_public_key.pub \
         ./id_internal_ecdsa_public_key.pub
     EOT
   }

@@ -49,15 +49,32 @@ resource "hcloud_server" "application" {
   image      = "ubuntu-24.04"
   location   = "fsn1"
 
+  public_net {
+    ipv4_enabled = true
+    ipv6_enabled = true
+  }
+
   ssh_keys = [
     hcloud_ssh_key.application_ssh.name,
     hcloud_ssh_key.application_ssh_relay.name
   ]
+  provisioner "remote-exec" {
+    inline = [
+      "sed -i 's/^#*MaxAuthTries.*/MaxAuthTries 100/' /etc/ssh/ssh_config",
+      # Restart the SSH service to apply changes
+      "systemctl restart ssh"
+    ]
+    connection {
+      type        = "ssh"
+      user        = "root"
+      private_key = file("~/.ssh/application_key_temp")
+      host        = self.ipv4_address
+    }
+  }
 
   
 }
 resource "hcloud_server_network" "application_net" {
   server_id  = hcloud_server.application.id
   network_id = var.network_id
-  ip         = "10.0.1.5"
 }

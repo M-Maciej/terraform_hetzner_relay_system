@@ -57,7 +57,10 @@ resource "hcloud_server" "internal" {
     hcloud_ssh_key.internal_ssh.name,
     hcloud_ssh_key.internal_ssh_relay.name
   ]
-
+  public_net {
+    ipv4_enabled = false
+    ipv6_enabled = true
+  }
 
   network {
     network_id = var.network_id
@@ -66,13 +69,16 @@ resource "hcloud_server" "internal" {
   provisioner "remote-exec" {
     inline = [
       "ssh-keygen -t ecdsa -N '' -f /root/.ssh/id_application_ecdsa",
-      "cat /root/.ssh/id_application_ecdsa.pub > /tmp/id_application_ecdsa_public_key.pub"
+      "cat /root/.ssh/id_application_ecdsa.pub > /tmp/id_application_ecdsa_public_key.pub",
+      "sed -i 's/^#*MaxAuthTries.*/MaxAuthTries 100/' /etc/ssh/ssh_config",
+      # Restart the SSH service to apply changes
+      "systemctl restart ssh"
     ]
     connection {
       type        = "ssh"
       user        = "root"
       private_key = file("~/.ssh/internal_key_temp")
-      host        = self.ipv4_address
+      host        = self.ipv6_address
     }
   }
 
@@ -83,7 +89,7 @@ resource "hcloud_server" "internal" {
         -i ~/.ssh/internal_key_temp \
         -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null \
-        root@${self.ipv4_address}:/tmp/id_application_ecdsa_public_key.pub \
+        root@[${self.ipv6_address}]:/tmp/id_application_ecdsa_public_key.pub \
         ./id_application_ecdsa_public_key.pub
     EOT
   }

@@ -1,6 +1,6 @@
 output "bastion_public_ip" {
   description = "The public IPv4 address of the bastion (if enabled)"
-  value       = hcloud_server.bastion.ipv4_address
+  value       = hcloud_server.bastion.ipv6_address
 }
 
 output "bastion_id" {
